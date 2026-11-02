@@ -1,0 +1,488 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeScript Todo App</title>
+
+    <!-- TypeScript Compiler -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.7.3/typescript.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f2ff;
+            padding: 30px;
+            color: #172033;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 14px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 8px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #e0e4ed;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 10px 14px;
+            border-radius: 7px;
+        }
+
+        .add-btn {
+            background: #387cf5;
+            color: white;
+            border: none;
+        }
+
+        .filters {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin: 15px 0;
+        }
+
+        .filter-btn {
+            background: white;
+            border: none;
+            color: #555;
+        }
+
+        .filter-btn.selected {
+            background: #e8efff;
+            color: #387cf5;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .todo-item span {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .todo-item.completed span {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            color: #777;
+            font-size: 13px;
+            gap: 10px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 7px;
+        }
+
+        .actions button {
+            background: white;
+            border: 1px solid #aaa;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>Todo App</h2>
+
+    <div class="input-area">
+        <input type="text" id="todoInput"
+               placeholder="What needs doing?">
+
+        <button class="add-btn" id="addBtn">Add</button>
+    </div>
+
+    <div class="filters">
+        <button class="filter-btn selected" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="active">Active</button>
+        <button class="filter-btn" data-filter="completed">Completed</button>
+    </div>
+
+    <div id="todoList"></div>
+
+    <div class="footer">
+        <span id="count">0 items left</span>
+
+        <div class="actions">
+            <button id="clearCompleted">Clear completed</button>
+            <button id="clearAll">Clear all</button>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ALL TYPESCRIPT CODE IN ONE PLACE -->
+
+<script type="text/typescript">
+
+// 1. INTERFACE
+
+interface Todo {
+    id: number;
+    text: string;
+    completed: boolean;
+}
+
+
+// 2. TYPE ALIAS
+
+type FilterType = "all" | "active" | "completed";
+
+
+// 3. VARIABLES
+
+let todos: Todo[] = [];
+
+let currentFilter: FilterType = "all";
+
+
+// 4. GET HTML ELEMENTS
+
+const todoInput = document.getElementById("todoInput") as HTMLInputElement;
+
+const addBtn = document.getElementById("addBtn") as HTMLButtonElement;
+
+const todoList = document.getElementById("todoList") as HTMLDivElement;
+
+const count = document.getElementById("count") as HTMLSpanElement;
+
+const clearCompletedBtn = document.getElementById("clearCompleted") as HTMLButtonElement;
+
+const clearAllBtn = document.getElementById("clearAll") as HTMLButtonElement;
+
+
+// 5. ADD TODO
+
+function addTodo(): void {
+
+    const text = todoInput.value.trim();
+
+    if (text === "") {
+        alert("Please enter a task!");
+        return;
+    }
+
+    const newTodo: Todo = {
+        id: Date.now(),
+        text: text,
+        completed: false
+    };
+
+    todos.push(newTodo);
+
+    todoInput.value = "";
+
+    renderTodos();
+}
+
+
+// 6. TOGGLE COMPLETED
+
+function toggleTodo(id: number): void {
+
+    todos = todos.map(todo => {
+
+        if (todo.id === id) {
+            return {
+                ...todo,
+                completed: !todo.completed
+            };
+        }
+
+        return todo;
+    });
+
+    renderTodos();
+}
+
+
+// 7. DELETE TODO
+
+function deleteTodo(id: number): void {
+
+    todos = todos.filter(todo => todo.id !== id);
+
+    renderTodos();
+}
+
+
+// 8. EDIT TODO
+
+function editTodo(id: number, span: HTMLSpanElement): void {
+
+    const todo = todos.find(todo => todo.id === id);
+
+    if (!todo) return;
+
+    const input = document.createElement("input");
+
+    input.type = "text";
+    input.value = todo.text;
+
+    span.replaceWith(input);
+
+    input.focus();
+
+    let saved = false;
+
+    function saveEdit(): void {
+
+        if (saved) return;
+
+        saved = true;
+
+        const newText = input.value.trim();
+
+        if (newText !== "") {
+            todo.text = newText;
+        }
+
+        renderTodos();
+    }
+
+    input.addEventListener("keydown", event => {
+
+        if (event.key === "Enter") {
+            saveEdit();
+        }
+
+        if (event.key === "Escape") {
+            saved = true;
+            renderTodos();
+        }
+
+    });
+
+    input.addEventListener("blur", saveEdit);
+}
+
+
+// 9. FILTER TODOS
+
+function filterTodos(filter: FilterType): void {
+
+    currentFilter = filter;
+
+    document.querySelectorAll(".filter-btn").forEach(button => {
+
+        button.classList.toggle(
+            "selected",
+            (button as HTMLButtonElement).dataset.filter === filter
+        );
+
+    });
+
+    renderTodos();
+}
+
+
+// 10. DISPLAY TODOS
+
+function renderTodos(): void {
+
+    todoList.innerHTML = "";
+
+    const filteredTodos = todos.filter(todo => {
+
+        if (currentFilter === "active") {
+            return !todo.completed;
+        }
+
+        if (currentFilter === "completed") {
+            return todo.completed;
+        }
+
+        return true;
+    });
+
+
+    filteredTodos.forEach(todo => {
+
+        const item = document.createElement("div");
+
+        item.className = "todo-item";
+
+        if (todo.completed) {
+            item.classList.add("completed");
+        }
+
+
+        // Checkbox
+
+        const checkbox = document.createElement("input");
+
+        checkbox.type = "checkbox";
+        checkbox.checked = todo.completed;
+
+        checkbox.addEventListener("change", () => {
+            toggleTodo(todo.id);
+        });
+
+
+        // Task text
+
+        const span = document.createElement("span");
+
+        span.textContent = todo.text;
+
+        span.addEventListener("dblclick", () => {
+            editTodo(todo.id, span);
+        });
+
+
+        // Delete button
+
+        const deleteBtn = document.createElement("button");
+
+        deleteBtn.textContent = "🗑";
+        deleteBtn.className = "delete-btn";
+
+        deleteBtn.addEventListener("click", () => {
+            deleteTodo(todo.id);
+        });
+
+
+        item.appendChild(checkbox);
+        item.appendChild(span);
+        item.appendChild(deleteBtn);
+
+        todoList.appendChild(item);
+
+    });
+
+
+    // Remaining tasks count
+
+    const remaining = todos.filter(todo => !todo.completed).length;
+
+    count.textContent = remaining + " items left";
+}
+
+
+// 11. CLEAR COMPLETED
+
+function clearCompleted(): void {
+
+    todos = todos.filter(todo => !todo.completed);
+
+    renderTodos();
+}
+
+
+// 12. CLEAR ALL
+
+function clearAll(): void {
+
+    todos = [];
+
+    renderTodos();
+}
+
+
+// 13. EVENT LISTENERS
+
+addBtn.addEventListener("click", addTodo);
+
+todoInput.addEventListener("keydown", event => {
+
+    if (event.key === "Enter") {
+        addTodo();
+    }
+
+});
+
+
+// Filter buttons
+
+document.querySelectorAll(".filter-btn").forEach(button => {
+
+    button.addEventListener("click", () => {
+
+        const filter = (button as HTMLButtonElement)
+            .dataset.filter as FilterType;
+
+        filterTodos(filter);
+
+    });
+
+});
+
+
+// Clear buttons
+
+clearCompletedBtn.addEventListener("click", clearCompleted);
+
+clearAllBtn.addEventListener("click", clearAll);
+
+
+// 14. INITIAL DISPLAY
+
+renderTodos();
+
+</script>
+
+
+<!-- COMPILE TYPESCRIPT AND EXECUTE JAVASCRIPT -->
+
+<script>
+    const tsCode = document.querySelector(
+        'script[type="text/typescript"]'
+    ).textContent;
+
+    const jsCode = ts.transpile(tsCode, {
+        target: ts.ScriptTarget.ES2020
+    });
+
+    const script = document.createElement("script");
+
+    script.textContent = jsCode;
+
+    document.body.appendChild(script);
+</script>
+
+</body>
+</html>
